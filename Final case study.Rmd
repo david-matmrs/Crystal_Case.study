@@ -1,0 +1,304 @@
+---
+title: "Case Study - Group 8 "
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+```{r}
+library(dplyr)
+library(ggplot2)
+tc_data <- read.csv("~/CrystalCourse/Tobacco_Consumption.csv")
+tc_data
+options(scipen = 999)
+
+tc_data <- tc_data %>% 
+  mutate(Domestic.percentage = (Domestic/Total)*100)
+```
+```{r}
+ggplot(rbind(tc_data %>% filter(Measure == "Cigarettes"), 
+             tc_data %>%  filter(Measure == "All Combustibles")), aes(Year, Total)) +
+  geom_jitter(color = "brown") + 
+  facet_grid(rows = vars(Measure)) +
+  labs(title = "Tobacco consumption of the most consumed categories across time")
+```
+
+Total consumption of cigarettes follows a very straight tendency with a negative slope
+The most consumed categories across time are still the most consumed nowadays, in spite of this negative tendency.
+
+```{r}
+ggplot(tc_data %>% 
+       filter(Measure != "Cigarettes") %>% 
+       filter(Measure != "All Combustibles"), aes(Year, Total)) +
+  geom_jitter(aes(color = Submeasure, shape = Topic)) + 
+  facet_grid(rows = vars(Measure)) +
+  labs(title = "Total tobacco consumption across time",  
+        caption = "Most common tobacco (cigarettes and all combustibles) types are omitted for better visualization")
+```
+It is specially Chewing tobacco, pipe tobacco, and large cigars which increase in use is more noticeable, while small cigars and the roll-your-own-tobacco types presented a sudden drop after 2007
+```{r}
+ggplot(tc_data, aes(Year, Imports)) +
+  geom_jitter(aes(color = Submeasure)) + 
+  facet_grid(rows = vars(Measure)) +
+  labs(title = "Number of imported tobacco types accross time")
+```
+Except for the two most common tobacco types, tobacco imports seem to follow demand (the graphs follow a similar tendency to the ones shownbefore on total consumption)
+
+We can observe how the US tries to produce its own tobacco for cigarettes and all combustibles for some years (from 2005 onward), but now seems to be starting to rely on imports again. 
+```{r}
+ggplot(tc_data, aes(Year, Imports.Per.Capita)) +
+  geom_jitter(aes(color = Submeasure)) + 
+  facet_grid(rows = vars(Measure)) +
+  labs(title = "Imports per capita of different tobacco types accross time") +
+  ylab("Amount of imports per capita")
+```
+
+Now we observe data similar to the last graph presented, only this data represents per capita imports. 
+```{r}
+ggplot(rbind(tc_data %>% filter(Measure == "Cigarettes"), 
+             tc_data %>%  filter(Measure == "All Combustibles")), aes(Year, Total)) +
+  geom_jitter(aes(color = Domestic.percentage)) + 
+  facet_grid(rows = vars(Measure)) +
+  labs(title = "Tobacco consumption of the most consumed categories across time")
+
+```
+
+Comentarios gráfica anterior
+These graphs are similar to some presented before, but allow us to observe how the most commonly-consumed tobacco has not always been produced domestically
+It was from years like 2008 to 2010 where the the most domestic products were consumed
+At least for the most consumed categories, import rate seems to be getting higher now
+```{r}
+ggplot(tc_data %>% 
+         filter(Measure != "Cigarettes") %>% 
+         filter(Measure != "All Combustibles"), aes(Year, Total)) +
+  geom_jitter(aes(color = Domestic.percentage, shape = Submeasure)) + 
+  scale_shape_manual(values = c(0, 1, 2, 3, 4, 8, 10, 11))+
+  facet_grid(rows = vars(Measure)) +
+  labs(title = "Total tobacco consumption across time",  
+       caption = "Most common tobacco (cigarettes and all combustibles) types are omitted for better visualization")
+```
+
+This pattern isn't observed for Loose Tobacco or smokeless tobacco, where domestic products still seem to be the most consumed
+There is, however, a noticeable change in the cigars graph, which presents a tendency to sell more imported cigars since after 2010
+```{r}
+#Selecting Total Column and creating time series
+tc <-select(tc_data,Total)
+
+t<-ts(tc,start=2000,frequency=12)
+plot(t)
+```
+
+```{r}
+acf(t)
+```
+
+
+
+```{r}
+library(ggplot2)
+library(fpp2)
+ggseasonplot(t, col=c("red","blue","green"), ear.labels=TRUE,main="Total ")
+```
+
+
+```{r}
+monthplot(t)
+```
+
+
+```{r}
+ggseasonplot(t,
+col=rainbow(12),year.labels=TRUE,polar=TRUE,main="Total")
+```
+
+```{r}
+gglagplot(t,24)
+```
+
+
+```{r}
+#Stationary Data
+tscaled <- scale(t, center = TRUE, scale = TRUE)
+plot(tscaled)
+acf(tscaled)
+```
+```{r}
+library(ggplot2)
+library(fpp2)
+ggseasonplot(tscaled, col=c("red","blue","green"), ear.labels=TRUE,main="Total ")
+monthplot(tscaled)
+```
+```{r}
+library(tseries)
+train.set<-head(tscaled,0.8*length(tscaled))# 80% of observations
+test.set<-tail(tscaled,0.2*length(tscaled))# 20% of observation
+adf.test(train.set) #it is stationary
+```
+
+
+```{r}
+plot(decompose(tscaled,type="multiplicative"))
+
+```
+
+Arima Forecast
+```{r}
+library(forecast)
+
+sarima<-auto.arima(train.set)
+summary(sarima)
+plot(forecast(sarima))
+
+```
+
+
+```{r}
+plot(forecast(sarima),0.2*length(tscaled),main="SARIMA mdoel",xlab="time",ylab="total")# ZOOM last 55 observations and the forecast
+```
+
+
+```{r}
+accuracy(sarima)
+```
+
+
+```{r}
+library(forecast)
+plot(forecast(sarima,0.2*length(tscaled)))
+lines(test.set,col="red")
+lines(sarima$fitted,col="orange")
+legend(1950,600,c("Train","Fit","Prediction","Test"),fill=c("black","orange",
+"blue","red"), box.col = "white")
+```
+ETS Model
+```{r}
+etsmodel<-ets(train.set)
+summary(etsmodel)
+```
+
+
+```{r}
+plot(forecast(etsmodel),0.2*length(tscaled))
+accuracy(forecast(etsmodel,0.2*length(tscaled)), test.set)
+```
+
+
+```{r}
+plot(forecast(etsmodel,0.2*length(tscaled)))
+lines(test.set,col="red")
+lines(etsmodel$fitted,col="orange")
+legend(1950,600,c("Train","Fit","Prediction","Test"),fill=c("black","orange",
+"blue","red"), box.col = "white")
+```
+RWF 
+```{r}
+drift.f <- rwf(train.set, h=218, drift = T)
+accuracy(drift.f, test.set)
+```
+
+```{r}
+plot(drift.f)
+```
+
+Stl + Arima
+```{r}
+stl.f<-stlf(train.set,55, method = "arima")
+summary(stl.f)
+```
+
+
+```{r}
+plot(forecast(stl.f))
+```
+```{r}
+accuracy(forecast(stl.f,55), test.set) 
+
+```
+
+```{r}
+plot(stlf(train.set,55, method = "arima"))
+lines(test.set,col="red")
+```
+```{r}
+Train<-head(tc_data,0.8*length(t))# 80% of observations
+Test<-tail(tc_data,0.2*length(t))# 20% of observation
+
+```
+
+
+NNAR
+```{r}
+fit <- nnetar(t, lambda=0)
+autoplot(forecast(fit,h=55))
+```
+
+```{r}
+nn.f2.1 = nnetar(t,lambda = 0)
+fit.s <- nnetar(train.set)
+autoplot(forecast(fit.s,h=55))
+```
+NNAR using external regressor
+```{r}
+nn.f2 = nnetar(ts(Train$Total,start=2000,frequency=12), xreg =
+ts(Train$Domestic,start=2000,frequency = 12))
+nnetforecast <- forecast(nn.f2, xreg =
+ts(Test$Domestic,start=c(2016),frequency=12), PI = T)
+autoplot(nnetforecast)+ylab("Total")+autolayer(ts(Test$Total,start=c(2016),frequency = 12),series="Data")
+
+```
+
+```{r}
+trainscaled <- scale(Train$Total, center = TRUE, scale = TRUE)
+testscaled <- scale(Test$Total,center = TRUE, scale = TRUE)
+trainscaledd <- scale(Train$Domestic, center = TRUE, scale = TRUE)
+testscaledd <- scale(Test$Domestic,center = TRUE, scale = TRUE)
+nn.f2 = nnetar(ts(trainscaled,start=2000,frequency=12), xreg =
+ts(trainscaledd,start=2000,frequency = 12))
+nnetforecast <- forecast(nn.f2, xreg =
+ts(testscaledd,start=c(2016),frequency=12), PI = T)
+autoplot(nnetforecast)+ylab("Total")+autolayer(ts(testscaled,start=c(2016),frequency = 12),series="Data")
+
+
+```
+
+
+```{r}
+summary(nn.f2)
+accuracy(nn.f2)
+```
+```{r}
+checkresiduals(nn.f2$residuals)
+
+```
+
+```{r}
+library(forecastHybrid)
+
+```
+Hybrid Model using Ext. Regressor
+```{r}
+hyb.mod.8 <- hybridModel(ts(trainscaled,start=2000,frequency=12), models =
+"an", a.args = list(xreg =ts(trainscaledd,start=2000,frequency=12)),
+n.args = list(xreg = ts(trainscaledd,start=2000,frequency=12)))
+```
+```{r}
+hyb.f8<-forecast(hyb.mod.8,xreg=ts(testscaledd,start=c(2016),frequency=12))
+autoplot(hyb.f8)+ylab("Total")+
+autolayer(ts(testscaled,start=c(2016),frequency = 12),series="Data")
+```
+```{r}
+checkresiduals(hyb.mod.8$residuals)
+accuracy(hyb.mod.8)
+
+
+```
+
